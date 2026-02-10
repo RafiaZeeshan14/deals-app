@@ -8,7 +8,7 @@ export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost
 // Create axios instance with default config
 const apiClient: AxiosInstance = axios.create({
     baseURL: `${API_BASE_URL}/api/v1`,
-    timeout: 10000,
+    timeout: 20000, // Increased timeout to 20 seconds
     headers: {
         'Content-Type': 'application/json',
     },
@@ -18,6 +18,7 @@ const apiClient: AxiosInstance = axios.create({
 apiClient.interceptors.request.use(
     async (config: InternalAxiosRequestConfig) => {
         try {
+            console.log(`[API Request] ${config.method?.toUpperCase()} ${config.url}`);
             const token = await AsyncStorage.getItem('@deals_app:token');
             if (token) {
                 console.log('Attaching Token in Frontend:', token.substring(0, 10) + '...');
@@ -31,6 +32,7 @@ apiClient.interceptors.request.use(
         return config;
     },
     (error) => {
+        console.error('[API Request Error]', error);
         return Promise.reject(error);
     }
 );
@@ -38,12 +40,18 @@ apiClient.interceptors.request.use(
 // Response interceptor - handle errors globally
 apiClient.interceptors.response.use(
     (response) => {
+        console.log(`[API Response] ${response.status} from ${response.config.url}`);
         return response;
     },
     (error: AxiosError) => {
+        const config = error.config;
+        if (error.code === 'ECONNABORTED' && error.message.includes('timeout')) {
+            console.error(`[API Timeout] ${config?.method?.toUpperCase()} ${config?.url} timed out after 20s`);
+        }
+
         if (error.response) {
             // Server responded with error
-            console.error('API Error:', error.response.status, error.response.data);
+            console.error(`[API Server Error] ${error.response.status} from ${config?.url}:`, error.response.data);
 
             // Handle 401 Unauthorized globally
             if (error.response.status === 401) {
@@ -52,22 +60,19 @@ apiClient.interceptors.response.use(
                     '@deals_app:user',
                     '@deals_app:token'
                 ]).catch(err => console.error('Error clearing storage:', err));
-
-                // You might want to trigger a Redux action here too, 
-                // but since we want to keep api.config independent if possible,
-                // we'll rely on the app detecting the missing token on re-render
-                // or the user being redirected by the layout.
             }
             return Promise.reject(error);
         } else if (error.request) {
             // Request made but no response
-            console.error('Network Error:', error.message);
+            console.error(`[API Network Error] No response from ${config?.url}. Check if backend at ${API_BASE_URL} is reachable.`);
+            console.error('Error Details:', error.message);
         } else {
             // Other errors
-            console.error('Error:', error.message);
+            console.error('[API Error]:', error.message);
         }
         return Promise.reject(error);
     }
 );
 
 export default apiClient;
+

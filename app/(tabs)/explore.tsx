@@ -4,6 +4,7 @@ import { ThemedView } from '@/components/themed-view';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Colors } from '@/constants/theme';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { Ionicons } from '@expo/vector-icons';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { setFilterCategory, fetchCategories, fetchAllOffers } from '@/store/slices/offersSlice';
 import { useRouter } from 'expo-router';
@@ -61,17 +62,19 @@ export default function CategoriesScreen() {
   };
 
   // Helper to get icon based on category name
-  const getCategoryIcon = (name: string) => {
+  const getCategoryIcon = (name: string): keyof typeof Ionicons.glyphMap => {
     const lowerName = name.toLowerCase();
-    if (lowerName.includes('fashion') || lowerName.includes('cloth')) return '👗';
-    if (lowerName.includes('food') || lowerName.includes('dining')) return '🍔';
-    if (lowerName.includes('electronic') || lowerName.includes('mobile')) return '📱';
-    if (lowerName.includes('beauty') || lowerName.includes('health')) return '💄';
-    if (lowerName.includes('travel') || lowerName.includes('hotel')) return '✈️';
-    if (lowerName.includes('entertainment') || lowerName.includes('movie')) return '🎬';
-    if (lowerName.includes('grocer')) return '🥦';
-    if (lowerName.includes('home') || lowerName.includes('living')) return '🏠';
-    return '📦';
+    if (lowerName.includes('fashion') || lowerName.includes('cloth')) return 'shirt-outline';
+    if (lowerName.includes('food') || lowerName.includes('dining')) return 'restaurant-outline';
+    if (lowerName.includes('electronic') || lowerName.includes('mobile')) return 'laptop-outline';
+    if (lowerName.includes('beauty') || lowerName.includes('health')) return 'sparkles-outline';
+    if (lowerName.includes('travel') || lowerName.includes('hotel')) return 'airplane-outline';
+    if (lowerName.includes('entertainment') || lowerName.includes('movie')) return 'film-outline';
+    if (lowerName.includes('grocer')) return 'leaf-outline';
+    if (lowerName.includes('home') || lowerName.includes('living')) return 'home-outline';
+    if (lowerName.includes('kid')) return 'happy-outline';
+    if (lowerName.includes('fast food')) return 'fast-food-outline';
+    return 'cube-outline';
   };
 
   // Helper to get color based on category name (consistent colors)
@@ -120,7 +123,7 @@ export default function CategoriesScreen() {
                   onPress={() => handleCategoryPress(category.name)}
                 >
                   <View style={styles.iconContainer}>
-                    <ThemedText style={styles.categoryIcon}>{icon}</ThemedText>
+                    <Ionicons name={icon} size={40} color={color} />
                   </View>
                   <ThemedText type="defaultSemiBold" style={styles.categoryName} numberOfLines={1}>
                     {category.name}
