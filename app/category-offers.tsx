@@ -9,12 +9,22 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View, Image, Alert } from 'react-native';
 
+// Centralized mapping for local category images to improve performance and reliability
+const CATEGORY_IMAGES: { [key: string]: any } = {
+  fashion: require('@/assets/images/fashion-category.jpeg'),
+  food: require('@/assets/images/food-category.jpeg'),
+  electronics: require('@/assets/images/electronics-category.jpeg'),
+  beauty: require('@/assets/images/beauty-category.jpeg'),
+  kid: require('@/assets/images/kids-category.jpg'),
+  all: require('@/assets/images/all-category.jpg'),
+};
+
 export default function CategoryOffersScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const router = useRouter();
   const dispatch = useAppDispatch();
-  
+
   // Get category details from route params
   const params = useLocalSearchParams();
   const categoryId = params.categoryId as string;
@@ -84,7 +94,7 @@ export default function CategoryOffersScreen() {
 
   const handleLoadMore = async () => {
     if (loading || !pagination || currentPage >= pagination.totalPages) return;
-    
+
     const nextPage = currentPage + 1;
     setCurrentPage(nextPage);
     await dispatch(fetchOffersByCategory({ categoryId, page: nextPage, limit: 10 }) as any);
@@ -112,9 +122,24 @@ export default function CategoryOffersScreen() {
         {/* Category Header */}
         <View style={[styles.categoryHeader, { backgroundColor: (categoryColor || '#FF6B35') + '10' }]}>
           <View style={[styles.categoryIconContainer, { backgroundColor: categoryColor || '#FF6B35' }]}>
-            <Text style={styles.categoryEmoji}>{categoryIcon || '📦'}</Text>
+            {categoryIcon === 'category-image' && categoryName ? (
+              <Image
+                source={
+                  categoryName.toLowerCase().includes('fashion') ? CATEGORY_IMAGES.fashion :
+                    categoryName.toLowerCase().includes('food') ? CATEGORY_IMAGES.food :
+                      categoryName.toLowerCase().includes('electronic') ? CATEGORY_IMAGES.electronics :
+                        categoryName.toLowerCase().includes('beauty') ? CATEGORY_IMAGES.beauty :
+                          categoryName.toLowerCase().includes('kid') ? CATEGORY_IMAGES.kid :
+                            CATEGORY_IMAGES.fashion // fallback
+                }
+                style={{ width: '100%', height: '100%', borderRadius: 50 }}
+                resizeMode="cover"
+              />
+            ) : (
+              <Text style={styles.categoryEmoji}>{categoryIcon || '📦'}</Text>
+            )}
           </View>
-          <Text style={styles.categoryTitle}>{categoryName}</Text>
+          <Text style={styles.categoryTitle}>{categoryName || 'Category'}</Text>
           <Text style={styles.offersCount}>
             {offers.length} {offers.length === 1 ? 'Offer' : 'Offers'} Available
           </Text>

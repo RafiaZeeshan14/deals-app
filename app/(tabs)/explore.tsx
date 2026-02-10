@@ -1,4 +1,4 @@
-import { StyleSheet, ScrollView, TouchableOpacity, View, RefreshControl, ActivityIndicator } from 'react-native';
+import { StyleSheet, ScrollView, TouchableOpacity, View, RefreshControl, ActivityIndicator, Image } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -37,19 +37,44 @@ export default function CategoriesScreen() {
     setRefreshing(false);
   };
 
+  // Helper to get count/icon display based on category name
+  const getCategoryDisplay = (name: string) => {
+    const lowerName = name.toLowerCase();
+    if (lowerName.includes('all')) {
+      return { type: 'image', source: require('@/assets/images/all-category.jpg') };
+    }
+    if (lowerName.includes('fashion') || lowerName.includes('cloth')) {
+      return { type: 'image', source: require('@/assets/images/fashion-category.jpeg') };
+    }
+    if (lowerName.includes('food') || lowerName.includes('dining')) {
+      return { type: 'image', source: require('@/assets/images/food-category.jpeg') };
+    }
+    if (lowerName.includes('electronic') || lowerName.includes('mobile')) {
+      return { type: 'image', source: require('@/assets/images/electronics-category.jpeg') };
+    }
+    if (lowerName.includes('beauty') || lowerName.includes('health')) {
+      return { type: 'image', source: require('@/assets/images/beauty-category.jpeg') };
+    }
+    if (lowerName.includes('kid')) {
+      return { type: 'image', source: require('@/assets/images/kids-category.jpg') };
+    }
+    return { type: 'icon', name: getCategoryIcon(name) };
+  };
+
   const handleCategoryPress = (categoryName: string) => {
     // Find the category object to get its ID
     const category = categories.find(cat => cat.name === categoryName);
     if (category) {
-      const icon = getCategoryIcon(category.name);
+      const displayName = category.name.toLowerCase() === 'fast food' ? 'Food & Restaurant' : category.name;
+      const display = getCategoryDisplay(category.name);
       const color = getCategoryColor(category.name);
-      
+
       router.push({
         pathname: '/category-offers',
         params: {
           categoryId: category.id,
-          categoryName: category.name,
-          categoryIcon: icon,
+          categoryName: displayName,
+          categoryIcon: display.type === 'image' ? 'category-image' : display.name,
           categoryColor: color,
         },
       });
@@ -111,26 +136,43 @@ export default function CategoriesScreen() {
           </View>
         ) : (
           <View style={styles.grid}>
-            {categories.map((category) => {
-              const icon = getCategoryIcon(category.name);
-              const color = getCategoryColor(category.name);
+            {categories
+              .filter(cat => {
+                const n = cat.name.toLowerCase();
+                if (['bbq', 'traditional', 'western wear'].includes(n)) return false;
+                // Filter out any other food-related categories to avoid duplicates
+                if ((n.includes('food') || n.includes('restaurant')) && n !== 'fast food') return false;
+                return true;
+              })
+              .map((category) => {
+                const displayName = category.name.toLowerCase() === 'fast food' ? 'Food & Restaurant' : category.name;
+                const display = getCategoryDisplay(category.name);
+                const color = getCategoryColor(category.name);
 
-              return (
-                <TouchableOpacity
-                  key={category.id}
-                  style={styles.categoryCard}
-                  activeOpacity={0.7}
-                  onPress={() => handleCategoryPress(category.name)}
-                >
-                  <View style={styles.iconContainer}>
-                    <Ionicons name={icon} size={40} color={color} />
-                  </View>
-                  <ThemedText type="defaultSemiBold" style={styles.categoryName} numberOfLines={1}>
-                    {category.name}
-                  </ThemedText>
-                </TouchableOpacity>
-              );
-            })}
+                return (
+                  <TouchableOpacity
+                    key={category.id}
+                    style={styles.categoryCard}
+                    activeOpacity={0.7}
+                    onPress={() => handleCategoryPress(category.name)}
+                  >
+                    <View style={styles.iconContainer}>
+                      {display.type === 'image' ? (
+                        <Image
+                          source={display.source}
+                          style={{ width: '100%', height: '100%', borderRadius: 40 }}
+                          resizeMode="cover"
+                        />
+                      ) : (
+                        <Ionicons name={display.name as any} size={40} color={color} />
+                      )}
+                    </View>
+                    <ThemedText type="defaultSemiBold" style={styles.categoryName} numberOfLines={1}>
+                      {displayName}
+                    </ThemedText>
+                  </TouchableOpacity>
+                );
+              })}
           </View>
         )}
       </ScrollView>

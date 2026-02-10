@@ -27,8 +27,19 @@ export default function HomeScreen() {
   const [activeCarouselIndex, setActiveCarouselIndex] = useState(0);
   const carouselScrollRef = useRef<ScrollView>(null);
 
-  // Combine "All" with fetched categories
-  const categories = ['All', ...fetchedCategories.map(cat => cat.name)];
+  // Combine "All" with fetched categories, filtering out unwanted ones and renaming "Fast Food"
+  const categories = [
+    'All',
+    ...fetchedCategories
+      .filter(cat => {
+        const n = cat.name.toLowerCase();
+        if (['bbq', 'traditional', 'western wear'].includes(n)) return false;
+        // Filter out any other food-related categories to avoid duplicates
+        if ((n.includes('food') || n.includes('restaurant')) && n !== 'fast food') return false;
+        return true;
+      })
+      .map(cat => cat.name.toLowerCase() === 'fast food' ? 'Food & Restaurant' : cat.name)
+  ];
 
   // Initialize data on mount - fetch from backend API
   useEffect(() => {
@@ -209,14 +220,14 @@ export default function HomeScreen() {
               // Get category image/emoji based on name
               const getCategoryDisplay = (name: string) => {
                 const lowerName = name.toLowerCase();
-                if (name === 'All') return { emoji: '🛍️', color: '#FF6B35' };
-                if (lowerName.includes('fashion')) return { emoji: '👗', color: '#E91E63' };
-                if (lowerName.includes('food')) return { emoji: '🍔', color: '#FF9800' };
-                if (lowerName.includes('electronic')) return { emoji: '📱', color: '#2196F3' };
-                if (lowerName.includes('beauty')) return { emoji: '💄', color: '#9C27B0' };
+                if (name === 'All') return { image: require('@/assets/images/all-category.jpg'), color: '#FF6B35' };
+                if (lowerName.includes('fashion')) return { image: require('@/assets/images/fashion-category.jpeg'), color: '#E91E63' };
+                if (lowerName.includes('food')) return { image: require('@/assets/images/food-category.jpeg'), color: '#FF9800' };
+                if (lowerName.includes('electronic')) return { image: require('@/assets/images/electronics-category.jpeg'), color: '#2196F3' };
+                if (lowerName.includes('beauty')) return { image: require('@/assets/images/beauty-category.jpeg'), color: '#9C27B0' };
                 if (lowerName.includes('men')) return { emoji: '👔', color: '#3F51B5' };
                 if (lowerName.includes('women')) return { emoji: '👚', color: '#E91E63' };
-                if (lowerName.includes('kid')) return { emoji: '🧸', color: '#FF5722' };
+                if (lowerName.includes('kid')) return { image: require('@/assets/images/kids-category.jpg'), color: '#FF5722' };
                 return { emoji: '📦', color: '#4CAF50' };
               };
 
@@ -232,14 +243,17 @@ export default function HomeScreen() {
                       setSelectedCategory(category);
                     } else {
                       // For other categories, navigate to category offers screen
-                      const categoryObj = fetchedCategories.find(cat => cat.name === category);
+                      const categoryObj = fetchedCategories.find(cat =>
+                        cat.name === category ||
+                        (cat.name.toLowerCase() === 'fast food' && category === 'Food & Restaurant')
+                      );
                       if (categoryObj) {
                         router.push({
                           pathname: '/category-offers',
                           params: {
                             categoryId: categoryObj.id,
                             categoryName: category,
-                            categoryIcon: display.emoji,
+                            categoryIcon: display.image ? 'category-image' : display.emoji,
                             categoryColor: display.color,
                           },
                         });
@@ -253,7 +267,15 @@ export default function HomeScreen() {
                     isSelected && { borderColor: display.color, borderWidth: 3 }
                   ]}>
                     <View style={[styles.categoryImageContainer, { backgroundColor: display.color + '20' }]}>
-                      <Text style={styles.categoryEmoji}>{display.emoji}</Text>
+                      {display.image ? (
+                        <Image
+                          source={display.image}
+                          style={{ width: '100%', height: '100%' }}
+                          resizeMode="cover"
+                        />
+                      ) : (
+                        <Text style={styles.categoryEmoji}>{display.emoji}</Text>
+                      )}
                     </View>
                   </View>
                   <Text style={[
@@ -402,78 +424,78 @@ export default function HomeScreen() {
                 }
                 // console.log('Rendering offer:', index, offer.id);
                 return (
-                 <TouchableOpacity
-                  key={offer.id}
-                  style={styles.offerCard}
-                  activeOpacity={0.9}
-                  onPress={() => handleOfferPress(offer)}
-                >
-                  {/* Image Section */}
-                  <View style={styles.offerImageContainer}>
-                    {offer?.imageUrl ? (
-                      <Image
-                        source={{ uri: offer.imageUrl }}
-                        style={styles.offerImageNew}
-                        resizeMode="cover"
-                      />
-                    ) : (
-                      <View style={[styles.offerBrandIcon, { backgroundColor: (offer?.brandColor || '#CCCCCC') + '20' }]}>
-                        <Text style={styles.offerBrandEmoji}>{offer?.brandIcon || '🏷️'}</Text>
-                      </View>
-                    )}
-
-                    {/* Badge on top left of image */}
-                    {offer?.badge && offer.badge !== 'none' && (
-                      <View style={[styles.offerBadgeContainerNew, { backgroundColor: offer.badgeColor || '#FF5722' }]}>
-                        <Text style={styles.offerBadgeTextNew}>{offer.badge.toUpperCase()}</Text>
-                      </View>
-                    )}
-
-                    {/* Favorite Button on top right of image */}
-                    <TouchableOpacity
-                      style={styles.favoriteButtonNew}
-                      onPress={(e) => {
-                        e.stopPropagation();
-                        if (offer) handleFavoriteToggle(offer);
-                      }}
-                    >
-                      <IconSymbol
-                        name={offer?.id && isFavorite(offer.id) ? "heart.fill" : "heart"}
-                        size={18}
-                        color={offer?.id && isFavorite(offer.id) ? "#FF4444" : "#1A1A1A"}
-                      />
-                    </TouchableOpacity>
-                  </View>
-
-                  {/* Content Section */}
-                  <View style={styles.offerContentNew}>
-                    <Text style={styles.offerTitleNew} numberOfLines={2}>{offer?.title || 'Untitled Offer'}</Text>
-
-                    <View style={styles.priceRow}>
-                      {offer?.discountedPrice && (
-                        <Text style={styles.offerPriceNew}>Rs:{offer.discountedPrice}</Text>
+                  <TouchableOpacity
+                    key={offer.id}
+                    style={styles.offerCard}
+                    activeOpacity={0.9}
+                    onPress={() => handleOfferPress(offer)}
+                  >
+                    {/* Image Section */}
+                    <View style={styles.offerImageContainer}>
+                      {offer?.imageUrl ? (
+                        <Image
+                          source={{ uri: offer.imageUrl }}
+                          style={styles.offerImageNew}
+                          resizeMode="cover"
+                        />
+                      ) : (
+                        <View style={[styles.offerBrandIcon, { backgroundColor: (offer?.brandColor || '#CCCCCC') + '20' }]}>
+                          <Text style={styles.offerBrandEmoji}>{offer?.brandIcon || '🏷️'}</Text>
+                        </View>
                       )}
-                      {offer?.originalPrice && (
-                        <Text style={styles.offerOriginalPriceNew}>Rs:{offer.originalPrice}</Text>
+
+                      {/* Badge on top left of image */}
+                      {offer?.badge && offer.badge !== 'none' && (
+                        <View style={[styles.offerBadgeContainerNew, { backgroundColor: offer.badgeColor || '#FF5722' }]}>
+                          <Text style={styles.offerBadgeTextNew}>{offer.badge.toUpperCase()}</Text>
+                        </View>
                       )}
-                      {offer?.discount && (
-                        <Text style={styles.offerDiscountTextNew}>{offer.discount} Off</Text>
-                      )}
+
+                      {/* Favorite Button on top right of image */}
+                      <TouchableOpacity
+                        style={styles.favoriteButtonNew}
+                        onPress={(e) => {
+                          e.stopPropagation();
+                          if (offer) handleFavoriteToggle(offer);
+                        }}
+                      >
+                        <IconSymbol
+                          name={offer?.id && isFavorite(offer.id) ? "heart.fill" : "heart"}
+                          size={18}
+                          color={offer?.id && isFavorite(offer.id) ? "#FF4444" : "#1A1A1A"}
+                        />
+                      </TouchableOpacity>
                     </View>
 
-                    <TouchableOpacity
-                      style={styles.grabDealButtonNew}
-                      onPress={() => offer && handleOfferPress(offer)}
-                    >
-                      <Text style={styles.grabDealTextNew}>Grab Deal</Text>
-                    </TouchableOpacity>
-                  </View>
-                </TouchableOpacity>
+                    {/* Content Section */}
+                    <View style={styles.offerContentNew}>
+                      <Text style={styles.offerTitleNew} numberOfLines={2}>{offer?.title || 'Untitled Offer'}</Text>
+
+                      <View style={styles.priceRow}>
+                        {offer?.discountedPrice && (
+                          <Text style={styles.offerPriceNew}>Rs:{offer.discountedPrice}</Text>
+                        )}
+                        {offer?.originalPrice && (
+                          <Text style={styles.offerOriginalPriceNew}>Rs:{offer.originalPrice}</Text>
+                        )}
+                        {offer?.discount && (
+                          <Text style={styles.offerDiscountTextNew}>{offer.discount} Off</Text>
+                        )}
+                      </View>
+
+                      <TouchableOpacity
+                        style={styles.grabDealButtonNew}
+                        onPress={() => offer && handleOfferPress(offer)}
+                      >
+                        <Text style={styles.grabDealTextNew}>Grab Deal</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </TouchableOpacity>
                 );
               })}
             </View>
           )}
-          
+
           {/* Load More Button */}
           {filteredOffers.length > 0 && pagination && pagination.current < pagination.totalPages && (
             <TouchableOpacity
