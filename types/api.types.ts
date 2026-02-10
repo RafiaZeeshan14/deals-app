@@ -5,6 +5,18 @@ export interface ApiResponse<T> {
     data: T;
 }
 
+export interface PaginationMetadata {
+    current: number;
+    pageSize: number;
+    total: number;
+    totalPages: number;
+}
+
+export interface PaginatedOffers {
+    offers: Offer[];
+    pagination: PaginationMetadata;
+}
+
 // Category
 export interface Category {
     id: string;
@@ -105,3 +117,15 @@ export interface User {
         subCategories?: string[];
     };
 }
+
+// Banner
+export interface Banner {
+    id: string;
+    brandName: string;
+    websiteUrl?: string;
+    bannerImage: string;
+    isActive: boolean;
+    createdAt: string;
+    updatedAt: string;
+}
+

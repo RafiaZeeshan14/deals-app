@@ -4,7 +4,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { offerService } from '@/services/offer.service';
 import { categoryService } from '@/services/category.service';
 import { brandService } from '@/services/brand.service';
-import { Offer as ApiOffer, Category as ApiCategory, Brand as ApiBrand } from '@/types/api.types';
+import { bannerService } from '@/services/banner.service';
+import { Offer as ApiOffer, Category as ApiCategory, Brand as ApiBrand, Banner as ApiBanner, PaginationMetadata } from '@/types/api.types';
 
 export interface Offer {
   id: string;
@@ -40,6 +41,7 @@ export interface Offer {
 interface OffersState {
   offers: Offer[];
   trendingOffers: Offer[];
+  banners: ApiBanner[];
   popularBrands: Array<{
     id: string;
     name: string;
@@ -59,6 +61,7 @@ interface OffersState {
   searchQuery: string;
   filterCategory: string | null;
   sortBy: 'recent' | 'discount' | 'popular';
+  pagination: PaginationMetadata | null;
 }
 
 // Helper function to transform API offer to app offer format
@@ -156,10 +159,15 @@ const transformApiOfferToAppOffer = (apiOffer: ApiOffer): Offer => {
 // Async thunks for fetching data from API
 export const fetchAllOffers = createAsyncThunk(
   'offers/fetchAll',
-  async (_, { rejectWithValue }) => {
+  async ({ page = 1, limit = 10 }: { page?: number, limit?: number } = {}, { rejectWithValue }) => {
     try {
-      const apiOffers = await offerService.getAllOffers();
-      return apiOffers.map(transformApiOfferToAppOffer);
+      const response = await offerService.getAllOffers(page, limit);
+      const appOffers = response.offers.map(transformApiOfferToAppOffer);
+      return {
+        offers: appOffers,
+        pagination: response.pagination,
+        page
+      };
     } catch (error: any) {
       return rejectWithValue(error.message || 'Failed to fetch offers');
     }
@@ -227,9 +235,22 @@ export const fetchAllBrands = createAsyncThunk(
   }
 );
 
+export const fetchBanners = createAsyncThunk(
+  'offers/fetchBanners',
+  async (_, { rejectWithValue }) => {
+    try {
+      const apiBanners = await bannerService.getAllBanners();
+      return apiBanners;
+    } catch (error: any) {
+      return rejectWithValue(error.message || 'Failed to fetch banners');
+    }
+  }
+);
+
 const initialState: OffersState = {
   offers: [],
   trendingOffers: [],
+  banners: [],
   popularBrands: [],
   categories: [],
   loading: false,
@@ -237,6 +258,7 @@ const initialState: OffersState = {
   searchQuery: '',
   filterCategory: null,
   sortBy: 'recent',
+  pagination: null,
 };
 
 const offersSlice = createSlice({
@@ -289,7 +311,17 @@ const offersSlice = createSlice({
     });
     builder.addCase(fetchAllOffers.fulfilled, (state, action) => {
       state.loading = false;
-      state.offers = action.payload;
+      const { offers, pagination, page } = action.payload;
+
+      if (page === 1) {
+        state.offers = offers;
+      } else {
+        // Append new offers, filtering out duplicates
+        const existingIds = new Set(state.offers.map(o => o.id));
+        const newUniqueOffers = offers.filter(o => !existingIds.has(o.id));
+        state.offers = [...state.offers, ...newUniqueOffers];
+      }
+      state.pagination = pagination;
     });
     builder.addCase(fetchAllOffers.rejected, (state, action) => {
       state.loading = false;
@@ -339,6 +371,7 @@ const offersSlice = createSlice({
     builder.addCase(fetchOffersByCategory.fulfilled, (state, action) => {
       state.loading = false;
       state.offers = action.payload;
+      state.pagination = null; // Backend doesn't support pagination for categories yet
     });
     builder.addCase(fetchOffersByCategory.rejected, (state, action) => {
       state.loading = false;
@@ -355,6 +388,20 @@ const offersSlice = createSlice({
       state.popularBrands = action.payload;
     });
     builder.addCase(fetchAllBrands.rejected, (state, action) => {
+      state.loading = false;
+      state.error = action.payload as string;
+    });
+
+    // Fetch banners
+    builder.addCase(fetchBanners.pending, (state) => {
+      state.loading = true;
+      state.error = null;
+    });
+    builder.addCase(fetchBanners.fulfilled, (state, action) => {
+      state.loading = false;
+      state.banners = action.payload;
+    });
+    builder.addCase(fetchBanners.rejected, (state, action) => {
       state.loading = false;
       state.error = action.payload as string;
     });

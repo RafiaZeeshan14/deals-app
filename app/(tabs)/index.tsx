@@ -4,11 +4,11 @@ import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { toggleFavoriteOnBackend, loadFavoritesFromBackend } from '@/store/slices/favoritesSlice';
-import { Offer, setCategories, setLoading, setOffers, setPopularBrands, setTrendingOffers, fetchAllOffers, fetchTrendingOffers, fetchCategories, fetchAllBrands } from '@/store/slices/offersSlice';
+import { Offer, setCategories, setLoading, setOffers, setPopularBrands, setTrendingOffers, fetchAllOffers, fetchTrendingOffers, fetchCategories, fetchAllBrands, fetchOffersByCategory, fetchBanners } from '@/store/slices/offersSlice';
 import { initialAllOffers, initialCategories, initialPopularBrands, initialTrendingOffers } from '@/utils/data';
 import { useRouter } from 'expo-router';
 import { useEffect, useState, useRef } from 'react';
-import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View, Image, Alert, Dimensions } from 'react-native';
+import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View, Image, Alert, Dimensions, Linking } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BrandColors, Gradients } from '@/constants/theme';
 
@@ -18,7 +18,7 @@ export default function HomeScreen() {
   const router = useRouter();
   const dispatch = useAppDispatch();
 
-  const { offers, trendingOffers, popularBrands, categories: fetchedCategories, loading } = useAppSelector((state) => state.offers);
+  const { offers, banners, popularBrands, categories: fetchedCategories, loading, pagination } = useAppSelector((state) => state.offers);
   const { favorites } = useAppSelector((state) => state.favorites);
   const { user, isAuthenticated } = useAppSelector((state) => state.user);
 
@@ -34,8 +34,8 @@ export default function HomeScreen() {
   useEffect(() => {
     if (offers.length === 0) {
       // Fetch data from backend APIs using Redux thunks
-      dispatch(fetchAllOffers() as any);
-      dispatch(fetchTrendingOffers() as any);
+      dispatch(fetchAllOffers({}) as any);
+      dispatch(fetchBanners() as any);
       dispatch(fetchCategories() as any);
       dispatch(fetchAllBrands() as any);
       if (isAuthenticated) {
@@ -44,23 +44,51 @@ export default function HomeScreen() {
     }
   }, [dispatch, isAuthenticated]);
 
-  // Filter offers based on selected category
-  const filteredOffers = selectedCategory === 'All'
-    ? offers
-    : offers.filter(offer => {
-      // Find the category object that matches the selected category name
-      const category = fetchedCategories.find(cat => cat.name === selectedCategory);
-      // Check if the offer's category matches the selected category ID
-      return category && offer.categoryId === category.id;
-    });
+  // Create a ref to track if it's the initial mount to avoid double fetching
+  const isInitialMount = useRef(true);
+
+  // Fetch offers when category changes
+  useEffect(() => {
+    // Skip the initial fetch if data is already loaded (handled by the mount useEffect)
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
+
+    const fetchByCategory = async () => {
+      dispatch(setLoading(true));
+      try {
+        if (selectedCategory === 'All') {
+          await dispatch(fetchAllOffers({ page: 1 }) as any);
+        } else {
+          // Find the category ID from the name
+          const category = fetchedCategories.find(cat => cat.name === selectedCategory);
+          if (category) {
+            await dispatch(fetchOffersByCategory(category.id) as any);
+          } else {
+            console.warn(`Category not found: ${selectedCategory}`);
+            // Fallback to all offers if category not found
+            await dispatch(fetchAllOffers({ page: 1 }) as any);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching filtered offers:', error);
+      }
+    };
+
+    fetchByCategory();
+  }, [selectedCategory, dispatch, fetchedCategories]);
+
+  // Use offers from store directly (server-side filtering)
+  const filteredOffers = offers;
 
   const onRefresh = async () => {
     setRefreshing(true);
     try {
       // Fetch fresh data from backend APIs
       await Promise.all([
-        dispatch(fetchAllOffers() as any),
-        dispatch(fetchTrendingOffers() as any),
+        dispatch(fetchAllOffers({}) as any),
+        dispatch(fetchBanners() as any),
         dispatch(fetchCategories() as any),
         dispatch(fetchAllBrands() as any),
       ]);
@@ -76,6 +104,11 @@ export default function HomeScreen() {
       pathname: '/offer-detail',
       params: { offerId: offer.id },
     });
+  };
+
+  const handleLoadMore = () => {
+    if (loading || !pagination || pagination.current >= pagination.totalPages) return;
+    dispatch(fetchAllOffers({ page: pagination.current + 1 }) as any);
   };
 
   const handleFavoriteToggle = (offer: Offer) => {
@@ -104,13 +137,13 @@ export default function HomeScreen() {
     return favorites.some(fav => fav.id === offerId);
   };
 
-  // Auto-scroll carousel effect
+  // Auto-scroll carousel effect for banners
   useEffect(() => {
-    if (trendingOffers.length <= 1) return;
+    if (banners.length <= 1) return;
 
     const interval = setInterval(() => {
       setActiveCarouselIndex((prevIndex) => {
-        const nextIndex = (prevIndex + 1) % trendingOffers.length;
+        const nextIndex = (prevIndex + 1) % banners.length;
 
         // Scroll to next item
         if (carouselScrollRef.current) {
@@ -126,7 +159,7 @@ export default function HomeScreen() {
     }, 3000); // Change slide every 3 seconds
 
     return () => clearInterval(interval);
-  }, [trendingOffers.length]);
+  }, [banners.length]);
 
   if (loading && offers.length === 0) {
     return (
@@ -216,14 +249,11 @@ export default function HomeScreen() {
           </ScrollView>
         </View>
 
-        {/* Trending Offers Section */}
-        {trendingOffers.length > 0 && (
+        {/* Banner Carousel Section */}
+        {banners.length > 0 && (
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Trending Offers</Text>
-              <TouchableOpacity>
-                <Text style={styles.viewAll}>View all</Text>
-              </TouchableOpacity>
+              <Text style={styles.sectionTitle}>Featured Banners</Text>
             </View>
 
             <View style={styles.carouselContainer}>
@@ -241,47 +271,36 @@ export default function HomeScreen() {
                 decelerationRate="fast"
                 snapToInterval={350}
               >
-                {trendingOffers.map((offer) => (
+                {banners.map((banner) => (
                   <TouchableOpacity
-                    key={offer.id}
+                    key={banner.id}
                     style={styles.trendingCard}
                     activeOpacity={0.9}
-                    onPress={() => handleOfferPress(offer)}
+                    onPress={() => {
+                      if (banner.websiteUrl) {
+                        Linking.openURL(banner.websiteUrl).catch(err => {
+                          console.error('Failed to open URL:', err);
+                          Alert.alert('Error', 'Could not open the link');
+                        });
+                      }
+                    }}
                   >
-                    <LinearGradient
-                      colors={['#FF6B9D', '#FFA06B']}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 1 }}
-                      style={styles.trendingGradientCard}
-                    >
-                      {/* Badge on top right */}
-                      <View style={styles.topRightBadge}>
-                        <Text style={styles.topRightBadgeText}>{offer.badge}</Text>
-                      </View>
-
-                      <View style={styles.trendingContent}>
-                        <Text style={styles.trendingBadgeNew}>{offer.discount || offer.badge}</Text>
-                        <Text style={styles.trendingTitleNew}>{offer.title}</Text>
-                        <Text style={styles.trendingDescriptionNew}>{offer.description}</Text>
-                        <TouchableOpacity style={styles.shopNowButtonNew}>
-                          <Text style={styles.shopNowTextNew}>Shop Now →</Text>
-                        </TouchableOpacity>
-                      </View>
-                      {offer.imageUrl && (
-                        <Image
-                          source={{ uri: offer.imageUrl }}
-                          style={styles.trendingImage}
-                          resizeMode="contain"
-                        />
-                      )}
-                    </LinearGradient>
+                    <Image
+                      source={{ uri: banner.bannerImage }}
+                      style={styles.bannerImage}
+                      resizeMode="cover"
+                    />
+                    {/* Brand name overlay */}
+                    <View style={styles.bannerOverlay}>
+                      <Text style={styles.bannerBrandName}>{banner.brandName}</Text>
+                    </View>
                   </TouchableOpacity>
                 ))}
               </ScrollView>
 
               {/* Pagination Dots */}
               <View style={styles.paginationContainer}>
-                {trendingOffers.map((_, index) => (
+                {banners.map((_, index) => (
                   <View
                     key={index}
                     style={[
@@ -350,8 +369,14 @@ export default function HomeScreen() {
             </View>
           ) : (
             <View style={styles.offersGrid}>
-              {filteredOffers.map((offer) => (
-                <TouchableOpacity
+              {filteredOffers.map((offer, index) => {
+                if (!offer) {
+                  console.log('Offer is undefined at index:', index);
+                  return null;
+                }
+                // console.log('Rendering offer:', index, offer.id);
+                return (
+                 <TouchableOpacity
                   key={offer.id}
                   style={styles.offerCard}
                   activeOpacity={0.9}
@@ -359,20 +384,20 @@ export default function HomeScreen() {
                 >
                   {/* Image Section */}
                   <View style={styles.offerImageContainer}>
-                    {offer.imageUrl ? (
+                    {offer?.imageUrl ? (
                       <Image
                         source={{ uri: offer.imageUrl }}
                         style={styles.offerImageNew}
                         resizeMode="cover"
                       />
                     ) : (
-                      <View style={[styles.offerBrandIcon, { backgroundColor: offer.brandColor + '20' }]}>
-                        <Text style={styles.offerBrandEmoji}>{offer.brandIcon}</Text>
+                      <View style={[styles.offerBrandIcon, { backgroundColor: (offer?.brandColor || '#CCCCCC') + '20' }]}>
+                        <Text style={styles.offerBrandEmoji}>{offer?.brandIcon || '🏷️'}</Text>
                       </View>
                     )}
 
                     {/* Badge on top left of image */}
-                    {offer.badge && offer.badge !== 'none' && (
+                    {offer?.badge && offer.badge !== 'none' && (
                       <View style={[styles.offerBadgeContainerNew, { backgroundColor: offer.badgeColor || '#FF5722' }]}>
                         <Text style={styles.offerBadgeTextNew}>{offer.badge.toUpperCase()}</Text>
                       </View>
@@ -383,43 +408,60 @@ export default function HomeScreen() {
                       style={styles.favoriteButtonNew}
                       onPress={(e) => {
                         e.stopPropagation();
-                        handleFavoriteToggle(offer);
+                        if (offer) handleFavoriteToggle(offer);
                       }}
                     >
                       <IconSymbol
-                        name={isFavorite(offer.id) ? "heart.fill" : "heart"}
+                        name={offer?.id && isFavorite(offer.id) ? "heart.fill" : "heart"}
                         size={18}
-                        color={isFavorite(offer.id) ? "#FF4444" : "#1A1A1A"}
+                        color={offer?.id && isFavorite(offer.id) ? "#FF4444" : "#1A1A1A"}
                       />
                     </TouchableOpacity>
                   </View>
 
                   {/* Content Section */}
                   <View style={styles.offerContentNew}>
-                    <Text style={styles.offerTitleNew} numberOfLines={2}>{offer.title}</Text>
+                    <Text style={styles.offerTitleNew} numberOfLines={2}>{offer?.title || 'Untitled Offer'}</Text>
 
                     <View style={styles.priceRow}>
-                      {offer.discountedPrice && (
+                      {offer?.discountedPrice && (
                         <Text style={styles.offerPriceNew}>${offer.discountedPrice}</Text>
                       )}
-                      {offer.originalPrice && (
+                      {offer?.originalPrice && (
                         <Text style={styles.offerOriginalPriceNew}>${offer.originalPrice}</Text>
                       )}
-                      {offer.discount && (
+                      {offer?.discount && (
                         <Text style={styles.offerDiscountTextNew}>{offer.discount} Off</Text>
                       )}
                     </View>
 
                     <TouchableOpacity
                       style={styles.grabDealButtonNew}
-                      onPress={() => handleOfferPress(offer)}
+                      onPress={() => offer && handleOfferPress(offer)}
                     >
                       <Text style={styles.grabDealTextNew}>Grab Deal</Text>
                     </TouchableOpacity>
                   </View>
                 </TouchableOpacity>
-              ))}
+                );
+              })}
             </View>
+          )}
+          
+          {/* Load More Button */}
+          {filteredOffers.length > 0 && pagination && pagination.current < pagination.totalPages && (
+            <TouchableOpacity
+              style={styles.loadMoreButton}
+              onPress={handleLoadMore}
+              disabled={loading}
+              activeOpacity={0.8}
+            >
+              {loading ? (
+                <ActivityIndicator color="#FFFFFF" size="small" />
+              ) : (
+                <Text style={styles.loadMoreText}>Load More</Text>
+              )}
+            </TouchableOpacity>
           )}
         </View>
       </ScrollView>
@@ -798,9 +840,53 @@ const styles = StyleSheet.create({
     fontSize: 32,
   },
   brandName: {
-    fontSize: 12,
-    fontWeight: '500',
+    fontSize: 10,
     color: '#333333',
+    textAlign: 'center',
+    fontWeight: '500',
+  },
+  loadMoreButton: {
+    backgroundColor: BrandColors.primary,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 24,
+    alignSelf: 'center',
+    marginTop: 24,
+    marginBottom: 10,
+    minWidth: 140,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: BrandColors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  loadMoreText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  bannerImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 20,
+  },
+  bannerOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    padding: 12,
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
+  },
+  bannerBrandName: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '700',
     textAlign: 'center',
   },
 });
+

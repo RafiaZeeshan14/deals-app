@@ -1,14 +1,14 @@
 import apiClient from './api.config';
-import { ApiResponse, Offer } from '../types/api.types';
+import { ApiResponse, Offer, PaginatedOffers } from '../types/api.types';
 
 export const offerService = {
     /**
      * Get all offers
      */
-    getAllOffers: async (): Promise<Offer[]> => {
+    getAllOffers: async (page: number = 1, limit: number = 10): Promise<PaginatedOffers> => {
         try {
-            const response = await apiClient.get<ApiResponse<Offer[]>>(
-                '/offers/getalloffers'
+            const response = await apiClient.get<ApiResponse<PaginatedOffers>>(
+                `/offers/getalloffers?page=${page}&limit=${limit}`
             );
             return response.data.data;
         } catch (error) {
