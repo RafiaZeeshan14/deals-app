@@ -27,7 +27,7 @@ export default function CategoriesScreen() {
 
   const loadData = async () => {
     dispatch(fetchCategories() as any);
-    dispatch(fetchAllOffers() as any);
+    dispatch(fetchAllOffers({}) as any);
   };
 
   const onRefresh = async () => {
@@ -37,8 +37,22 @@ export default function CategoriesScreen() {
   };
 
   const handleCategoryPress = (categoryName: string) => {
-    dispatch(setFilterCategory(categoryName));
-    router.push('/(tabs)');
+    // Find the category object to get its ID
+    const category = categories.find(cat => cat.name === categoryName);
+    if (category) {
+      const icon = getCategoryIcon(category.name);
+      const color = getCategoryColor(category.name);
+      
+      router.push({
+        pathname: '/category-offers',
+        params: {
+          categoryId: category.id,
+          categoryName: category.name,
+          categoryIcon: icon,
+          categoryColor: color,
+        },
+      });
+    }
   };
 
   // Helper to get deal count for a category

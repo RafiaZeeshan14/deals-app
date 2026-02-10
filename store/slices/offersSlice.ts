@@ -189,12 +189,36 @@ export const fetchTrendingOffers = createAsyncThunk(
 
 export const fetchOffersByCategory = createAsyncThunk(
   'offers/fetchByCategory',
-  async (categoryId: string, { rejectWithValue }) => {
+  async ({ categoryId, page = 1, limit = 10 }: { categoryId: string, page?: number, limit?: number }, { rejectWithValue }) => {
     try {
-      const apiOffers = await offerService.getOffersByCategoryId(categoryId);
+      const response = await offerService.getOffersByCategoryId(categoryId, page, limit);
+
+      if (!response || !response.offers) {
+        console.error('Invalid response structure from category offers API');
+        return rejectWithValue('Invalid response from server');
+      }
+
+      const appOffers = response.offers.map(transformApiOfferToAppOffer);
+      return {
+        offers: appOffers,
+        pagination: response.pagination,
+        page
+      };
+    } catch (error: any) {
+      console.error('Error fetching category offers:', error);
+      return rejectWithValue(error.message || 'Failed to fetch offers');
+    }
+  }
+);
+
+export const fetchOffersByBrand = createAsyncThunk(
+  'offers/fetchByBrand',
+  async (brandId: string, { rejectWithValue }) => {
+    try {
+      const apiOffers = await offerService.getOffersByBrandId(brandId);
       return apiOffers.map(transformApiOfferToAppOffer);
     } catch (error: any) {
-      return rejectWithValue(error.message || 'Failed to fetch offers');
+      return rejectWithValue(error.message || 'Failed to fetch offers by brand');
     }
   }
 );
@@ -370,8 +394,17 @@ const offersSlice = createSlice({
     });
     builder.addCase(fetchOffersByCategory.fulfilled, (state, action) => {
       state.loading = false;
-      state.offers = action.payload;
-      state.pagination = null; // Backend doesn't support pagination for categories yet
+      const { offers, pagination, page } = action.payload;
+
+      if (page === 1) {
+        state.offers = offers;
+      } else {
+        // Append new offers, filtering out duplicates
+        const existingIds = new Set(state.offers.map(o => o.id));
+        const newUniqueOffers = offers.filter(o => !existingIds.has(o.id));
+        state.offers = [...state.offers, ...newUniqueOffers];
+      }
+      state.pagination = pagination;
     });
     builder.addCase(fetchOffersByCategory.rejected, (state, action) => {
       state.loading = false;
@@ -402,6 +435,21 @@ const offersSlice = createSlice({
       state.banners = action.payload;
     });
     builder.addCase(fetchBanners.rejected, (state, action) => {
+      state.loading = false;
+      state.error = action.payload as string;
+    });
+
+    // Fetch offers by brand
+    builder.addCase(fetchOffersByBrand.pending, (state) => {
+      state.loading = true;
+      state.error = null;
+    });
+    builder.addCase(fetchOffersByBrand.fulfilled, (state, action) => {
+      state.loading = false;
+      state.offers = action.payload;
+      state.pagination = null; // Backend doesn't support pagination for brand filtering yet
+    });
+    builder.addCase(fetchOffersByBrand.rejected, (state, action) => {
       state.loading = false;
       state.error = action.payload as string;
     });

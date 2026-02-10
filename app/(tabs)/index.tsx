@@ -64,7 +64,7 @@ export default function HomeScreen() {
           // Find the category ID from the name
           const category = fetchedCategories.find(cat => cat.name === selectedCategory);
           if (category) {
-            await dispatch(fetchOffersByCategory(category.id) as any);
+            await dispatch(fetchOffersByCategory({ categoryId: category.id, page: 1 }) as any);
           } else {
             console.warn(`Category not found: ${selectedCategory}`);
             // Fallback to all offers if category not found
@@ -176,7 +176,7 @@ export default function HomeScreen() {
       <View style={styles.header}>
         <View style={styles.headerContent}>
           <View>
-            <Text style={styles.greeting}>Hi, {user?.name?.split(' ')[0] || 'Alex'} 👋</Text>
+            <Text style={styles.greeting}>Hi, {isAuthenticated && user?.name ? user.name.split(' ')[0] : 'Guest'} 👋</Text>
             <Text style={styles.subtitle}>Discover today's best deals</Text>
           </View>
           <TouchableOpacity
@@ -226,7 +226,26 @@ export default function HomeScreen() {
                 <TouchableOpacity
                   key={category}
                   style={styles.categoryItem}
-                  onPress={() => setSelectedCategory(category)}
+                  onPress={() => {
+                    if (category === 'All') {
+                      // For "All", just filter on home screen
+                      setSelectedCategory(category);
+                    } else {
+                      // For other categories, navigate to category offers screen
+                      const categoryObj = fetchedCategories.find(cat => cat.name === category);
+                      if (categoryObj) {
+                        router.push({
+                          pathname: '/category-offers',
+                          params: {
+                            categoryId: categoryObj.id,
+                            categoryName: category,
+                            categoryIcon: display.emoji,
+                            categoryColor: display.color,
+                          },
+                        });
+                      }
+                    }
+                  }}
                   activeOpacity={0.7}
                 >
                   <View style={[
@@ -334,8 +353,15 @@ export default function HomeScreen() {
                   style={styles.brandItem}
                   activeOpacity={0.7}
                   onPress={() => {
-                    // Navigate to brand offers or similar
-                    // For now, maybe just log or something
+                    // Navigate to brand offers screen
+                    router.push({
+                      pathname: '/brand-offers',
+                      params: {
+                        brandId: brand.id,
+                        brandName: brand.name,
+                        brandIcon: brand.icon,
+                      },
+                    });
                   }}
                 >
                   <View style={styles.brandCircle}>
@@ -425,10 +451,10 @@ export default function HomeScreen() {
 
                     <View style={styles.priceRow}>
                       {offer?.discountedPrice && (
-                        <Text style={styles.offerPriceNew}>${offer.discountedPrice}</Text>
+                        <Text style={styles.offerPriceNew}>Rs:{offer.discountedPrice}</Text>
                       )}
                       {offer?.originalPrice && (
-                        <Text style={styles.offerOriginalPriceNew}>${offer.originalPrice}</Text>
+                        <Text style={styles.offerOriginalPriceNew}>Rs:{offer.originalPrice}</Text>
                       )}
                       {offer?.discount && (
                         <Text style={styles.offerDiscountTextNew}>{offer.discount} Off</Text>
@@ -818,7 +844,7 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#ffffffff',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 8,

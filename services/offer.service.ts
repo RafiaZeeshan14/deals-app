@@ -49,12 +49,12 @@ export const offerService = {
     },
 
     /**
-     * Get offers by category ID
+     * Get offers by category ID with pagination
      */
-    getOffersByCategoryId: async (categoryId: string): Promise<Offer[]> => {
+    getOffersByCategoryId: async (categoryId: string, page: number = 1, limit: number = 10): Promise<PaginatedOffers> => {
         try {
-            const response = await apiClient.get<ApiResponse<Offer[]>>(
-                `/offers/getoffersbycategoryid/${categoryId}`
+            const response = await apiClient.get<ApiResponse<PaginatedOffers>>(
+                `/offers/getoffersbycategoryid/${categoryId}?page=${page}&limit=${limit}`
             );
             return response.data.data;
         } catch (error) {
