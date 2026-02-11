@@ -74,8 +74,8 @@ export default function ProfileScreen() {
         >
           {/* Profile Header */}
           <View style={[styles.profileHeader, { backgroundColor: colors.background }]}>
-            <View style={styles.profileImage}>
-              <Text style={styles.profileEmoji}>{user.avatar || '👩'}</Text>
+            <View style={[styles.profileImage, { backgroundColor: '#E2E8F0', borderColor: '#FFFFFF' }]}>
+              <IconSymbol name="person.fill" size={60} color="#475569" />
             </View>
             <Text style={[styles.profileName, { color: colors.text }]}>{user.name}</Text>
             <Text style={[styles.profileEmail, { color: colors.icon }]}>{user.email}</Text>

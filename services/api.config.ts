@@ -7,17 +7,23 @@ export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost
 
 // Create axios instance with default config
 const apiClient: AxiosInstance = axios.create({
-    baseURL: `${API_BASE_URL}/api/v1`,
+    baseURL: API_BASE_URL,
     timeout: 20000, // Increased timeout to 20 seconds
     headers: {
         'Content-Type': 'application/json',
     },
 });
 
-// Request interceptor - add auth token if available
+// Request interceptor - add auth token and handle path prefixing
 apiClient.interceptors.request.use(
     async (config: InternalAxiosRequestConfig) => {
         try {
+            // Ensure path starts with /api/v1 for backend routing
+            if (config.url && !config.url.startsWith('/api/v1')) {
+                const cleanUrl = config.url.startsWith('/') ? config.url : `/${config.url}`;
+                config.url = `/api/v1${cleanUrl}`;
+            }
+
             console.log(`[API Request] ${config.method?.toUpperCase()} ${config.url}`);
             const token = await AsyncStorage.getItem('@deals_app:token');
             if (token) {

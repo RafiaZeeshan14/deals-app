@@ -191,11 +191,11 @@ export default function HomeScreen() {
             <Text style={styles.subtitle}>Discover today's best deals</Text>
           </View>
           <TouchableOpacity
-            style={[styles.profileImage, { borderColor: BrandColors.primary }]}
+            style={[styles.profileImage, { backgroundColor: '#E2E8F0', borderColor: BrandColors.primary }]}
             onPress={() => router.push('/(tabs)/profile')}
             activeOpacity={0.7}
           >
-            <Text style={styles.profileEmoji}>{user?.avatar || '👩'}</Text>
+            <IconSymbol name="person.fill" size={30} color="#475569" />
           </TouchableOpacity>
         </View>
       </View>
